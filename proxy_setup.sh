@@ -19,6 +19,12 @@ set_proxy_wget() {
     echo "https_proxy = $PROXY" >> "$conf_file"
 }
 
+set_git_user() {
+    echo "[*] Configuring git user..."
+    git config --global user.name "laoshanxi"
+    git config --global user.email "178029200@qq.com"
+}
+
 set_proxy_git() {
     echo "[*] Configuring git proxy..."
     git config --global http.proxy "$PROXY"
@@ -53,11 +59,43 @@ EOF
     fi
 }
 
+set_proxy_wsl_environment() {
+    echo "[*] Configuring system-wide proxy via /etc/environment..."
+    local env_file="/etc/environment"
+    local temp_file="$(mktemp)"
+    
+    # Copy existing content
+    if [ -f "$env_file" ]; then
+        cp "$env_file" "$temp_file"
+    fi
+    
+    # Remove existing proxy lines
+    sed -i '/^http_proxy=/d; /^https_proxy=/d; /^HTTP_PROXY=/d; /^HTTPS_PROXY=/d; /^no_proxy=/d; /^NO_PROXY=/d' "$temp_file" 2>/dev/null || true
+    
+    # Append new proxy settings
+    {
+        echo "http_proxy=$PROXY"
+        echo "https_proxy=$PROXY"
+        echo "HTTP_PROXY=$PROXY"
+        echo "HTTPS_PROXY=$PROXY"
+        echo 'no_proxy="localhost,127.0.0.1,::1"'
+        echo 'NO_PROXY="localhost,127.0.0.1,::1"'
+    } >> "$temp_file"
+    
+    # Write back with sudo
+    sudo cp "$temp_file" "$env_file"
+    rm -f "$temp_file"
+    
+    echo "[*] System-wide proxy set in $env_file"
+}
+
+
 set_all() {
     set_proxy_wget
     set_proxy_git
     set_proxy_apt
     set_proxy_pip
+    set_proxy_wsl_environment
     echo "[*] Proxy configuration applied successfully."
 }
 
