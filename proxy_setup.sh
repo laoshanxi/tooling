@@ -19,6 +19,19 @@ set_proxy_wget() {
     echo "https_proxy = $PROXY" >> "$conf_file"
 }
 
+set_proxy_curl() {
+    echo "[*] Configuring curl proxy via ~/.curlrc..."
+    local conf_file="$HOME/.curlrc"
+    mkdir -p "$(dirname "$conf_file")" 2>/dev/null
+    
+    if [ -f "$conf_file" ]; then
+        sed -i '/^proxy /d; /^proxy = /d' "$conf_file" || true
+    fi
+    
+    echo "proxy = ${PROXY_HOST}:${PROXY_PORT}" >> "$conf_file"
+    echo "[*] curl proxy set in $conf_file"
+}
+
 set_git_user() {
     echo "[*] Configuring git user..."
     git config --global user.name "laoshanxi"
@@ -89,13 +102,37 @@ set_proxy_wsl_environment() {
     echo "[*] System-wide proxy set in $env_file"
 }
 
+set_alias_ll() {
+    echo "[*] Setting up 'll' alias globally via /etc/profile.d/aliases.sh..."
+    local alias_file="/etc/profile.d/aliases.sh"
+    
+    # Ensure directory exists
+    sudo mkdir -p "$(dirname "$alias_file")"
+    
+    # Truncate and recreate the file with all aliases
+    sudo bash -c "cat > $alias_file" <<'EOF'
+#!/bin/bash
+# System-wide aliases — loaded for all users
+
+# List files in long format
+alias ll='ls -l'
+alias la='ls -A'
+alias l='ls -CF'
+EOF
+    
+    sudo chmod +x "$alias_file"
+    echo "[*] 'll' alias setup completed in $alias_file"
+}
+
 
 set_all() {
     set_proxy_wget
+    set_proxy_curl
     set_proxy_git
     set_proxy_apt
     set_proxy_pip
     set_proxy_wsl_environment
+    set_alias_ll
     echo "[*] Proxy configuration applied successfully."
 }
 
