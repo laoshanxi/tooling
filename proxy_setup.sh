@@ -124,6 +124,62 @@ EOF
     echo "[*] 'll' alias setup completed in $alias_file"
 }
 
+set_proxy_docker() {
+    # echo "[*] Configuring Docker permission..."
+    # sudo usermod -aG docker $USER
+    # newgrp docker
+    
+    echo "[*] Configuring Docker proxy..."
+    
+    # Docker systemd service config directory
+    local docker_conf_dir="/etc/systemd/system/docker.service.d"
+    local docker_conf_file="${docker_conf_dir}/http-proxy.conf"
+    
+    # Create directory if not exists
+    sudo mkdir -p "$docker_conf_dir"
+    
+    # Write proxy configuration to the file
+    sudo bash -c "cat > $docker_conf_file" <<EOF
+[Service]
+Environment="HTTP_PROXY=$PROXY"
+Environment="HTTPS_PROXY=$PROXY"
+Environment="NO_PROXY=localhost,127.0.0.1,::1"
+EOF
+    
+    # Reload systemd and restart Docker
+    sudo systemctl daemon-reload
+    sudo systemctl restart docker
+    
+    # Wait a moment for Docker to start
+    sleep 2
+    
+    # Verify Docker proxy is set (optional)
+    if command -v docker &> /dev/null; then
+        echo "[*] Verifying Docker proxy settings..."
+        docker info | grep -E "(HTTP Proxy|HTTPS Proxy|No Proxy)" || echo "[!] Docker proxy may not be active — ensure Docker is running."
+    else
+        echo "[!] Docker is not installed or not in PATH."
+    fi
+    
+    echo "[*] Docker proxy configured in $docker_conf_file"
+}
+
+set_proxy_docker_build_image() {
+    sudo bash -c "cat > Dockerfile" <<EOF
+    FROM python:3.13.7-slim-bookworm AS build_stage
+
+    # --- Proxy configuration ---
+    ENV HTTP_PROXY=http://172.22.62.85:7890
+    ENV HTTPS_PROXY=http://172.22.62.85:7890
+    # Optional: If using apt/yum/pip/wget inside container
+    RUN echo "Acquire::http::Proxy \"$HTTP_PROXY\";" > /etc/apt/apt.conf.d/01proxy \
+        && echo "Acquire::https::Proxy \"$HTTPS_PROXY\";" >> /etc/apt/apt.conf.d/01proxy \
+        && echo "export http_proxy=$HTTP_PROXY" >> ~/.bashrc \
+        && echo "export https_proxy=$HTTPS_PROXY" >> ~/.bashrc
+    # --- End proxy config ---
+    EOF
+}
+
 
 set_all() {
     set_proxy_wget
@@ -132,6 +188,7 @@ set_all() {
     set_proxy_apt
     set_proxy_pip
     set_proxy_wsl_environment
+    set_proxy_docker
     set_alias_ll
     echo "[*] Proxy configuration applied successfully."
 }
